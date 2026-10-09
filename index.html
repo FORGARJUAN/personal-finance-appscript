@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link href="https://cdn.jsdelivr.net/npm/@sweetalert2/theme-material-ui/material-ui.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+      :root { --primary-gradient: linear-gradient(135deg, #0d6efd 0%, #0043a8 100%); --bg-color: #f0f2f5; }
+      body { background-color: var(--bg-color); font-family: 'Segoe UI', sans-serif; padding-bottom: 80px; }
+      
+      .global-header { padding: 15px 20px 0 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+      .main-card { border: none; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); background: white; margin-bottom: 20px; overflow: hidden;}
+      .card-header-custom { background: var(--primary-gradient); color: white; padding: 25px 20px; text-align: center; }
+      .btn-check:checked + .btn-outline-primary { background-color: #e7f1ff; color: #0d6efd; border-color: #0d6efd; font-weight: 700; }
+      .btn-outline-primary { border-color: #dee2e6; color: #6c757d; border-radius: 12px; padding: 10px 5px; width: 100%; transition: all 0.2s;}
+      .form-control, .form-select { border-radius: 12px; padding: 12px; }
+      .btn-guardar { background: var(--primary-gradient); border: none; padding: 15px; border-radius: 12px; font-weight: 600; color:white; width: 100%;}
+      #loader-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); z-index: 9999; display: none; flex-direction: column; justify-content: center; align-items: center; }
+      .hidden { display: none; } .d-none-custom { display: none !important; }
+      
+      .summary-box { border-radius: 15px; padding: 15px; text-align: center; color: white; margin-bottom: 10px; }
+      .bg-ingreso { background: linear-gradient(135deg, #20c997, #198754); }
+      .bg-gasto { background: linear-gradient(135deg, #ff6b6b, #dc3545); }
+      .bg-balance { background: linear-gradient(135deg, #0dcaf0, #0d6efd); }
+
+      .historial-item { border-left: 4px solid #0d6efd; background: #f8f9fa; border-radius: 8px; padding: 12px; margin-bottom: 10px;}
+      .btn-action { background: none; border: none; font-size: 1.2rem; padding: 5px; cursor: pointer; transition: transform 0.2s;}
+      
+      /* Botones Menú - Reducido para 5 ítems */
+      .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: white; box-shadow: 0 -5px 15px rgba(0,0,0,0.05); display: flex; justify-content: space-around; padding: 10px 0; z-index: 1000; border-radius: 20px 20px 0 0; }
+      .nav-item { text-align: center; color: #adb5bd; cursor: pointer; flex: 1; transition: all 0.3s; padding: 0 2px;}
+      .nav-item.active { color: #0d6efd; transform: translateY(-3px); }
+      .nav-item i { font-size: 1.3rem; display: block; } 
+      .nav-item small { font-weight: 600; font-size: 0.65rem; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+      
+      .checklist-item { font-size: 0.95rem; padding: 8px 5px; border-bottom: 1px dashed #e9ecef; display: flex; justify-content: space-between; align-items: center; }
+      .checklist-item:last-child { border-bottom: none; }
+      .filter-btn { border-radius: 20px; padding: 4px 12px; font-size: 0.8rem; cursor: pointer; border: 1px solid #dee2e6; background: white; white-space: nowrap; }
+      .filter-btn.active { background: #0d6efd; color: white; border-color: #0d6efd; }
+      
+      /* Estilos Acordeón */
+      .accordion-button:not(.collapsed) { background-color: #e7f1ff; color: #0d6efd; font-weight: bold; }
+      .accordion-button { font-weight: 600; color: #495057; }
+    </style>
+  </head>
+  <body>
+
+    <div id="loader-overlay"><div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div><p class="mt-3 fw-bold text-primary" id="loader-text">Cargando...</p></div>
+
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5 p-0">
+          
+          <div class="global-header">
+             <h4 class="fw-bold text-primary m-0" id="saludo-usuario">Hola...</h4>
+             <span class="badge bg-primary rounded-pill fs-6 px-3 py-2"><i class="bi bi-calendar3"></i> 2026</span>
+          </div>
+
+          <div id="vista-registro" class="main-card mx-2">
+            <div class="card-header-custom"><h3 class="m-0 fw-bold"><i class="bi bi-wallet2 me-2"></i>Nuevo Registro</h3></div>
+            <div class="p-4">
+              <form id="formulario-gasto" autocomplete="off">
+                <div class="mb-3">
+                  <label class="d-block mb-2 fw-bold text-secondary small">Perfil / ¿De quién es?</label>
+                  <div class="row g-2" id="contenedor-tipos"></div>
+                </div>
+                <div class="mb-4">
+                  <label class="d-block mb-2 fw-bold text-secondary small">Método de Pago</label>
+                  <div class="row g-2" id="contenedor-metodos"></div>
+                </div>
+                <div class="form-floating mb-3"><select class="form-select" id="categoria" onchange="actualizarSubcategorias()"><option value="" disabled selected>Cargando...</option></select><label>Categoría General</label></div>
+                <div id="div-subcategoria" class="form-floating mb-3 hidden"><select class="form-select" id="subcategoria"></select><label>Detalle / Subcategoría</label></div>
+                <div class="form-floating mb-3"><input type="text" class="form-control" id="concepto" placeholder="Ej: Almuerzo" required><label>Concepto / Descripción</label></div>
+                <div class="input-group mb-4"><span class="input-group-text bg-light fw-bold text-success">$</span><div class="form-floating"><input type="text" class="form-control" id="monto" placeholder="0" inputmode="numeric" oninput="formatoMoneda(this)" required style="font-size: 1.2rem; font-weight: bold;"><label>Monto</label></div></div>
+                
+                <div class="form-check form-switch mb-3">
+                  <input class="form-check-input" type="checkbox" id="toggle-evidencia" onchange="document.getElementById('div-evidencia').classList.toggle('d-none')">
+                  <label class="form-check-label fw-bold text-secondary" for="toggle-evidencia">¿Subir evidencia?</label>
+                </div>
+                <div id="div-evidencia" class="mb-3 d-none"><input type="file" class="form-control" id="archivo" accept="image/*,application/pdf"></div>
+
+                <div class="bg-light p-3 rounded-3 mb-4"><input type="password" class="form-control text-center" id="pin-seguridad" placeholder="PIN de Seguridad" maxlength="6"></div>
+                <button type="button" class="btn-guardar shadow" onclick="procesarYEnviar()">GUARDAR REGISTRO <i class="bi bi-send-fill ms-2"></i></button>
+              </form>
+            </div>
+          </div>
+
+          <div id="vista-historial" class="main-card mx-2 d-none-custom">
+            <div class="card-header-custom" style="background: linear-gradient(135deg, #6c757d 0%, #343a40 100%);"><h3 class="m-0 fw-bold"><i class="bi bi-clock-history me-2"></i>Historial</h3></div>
+            
+            <div class="p-3 bg-light border-bottom">
+              <h6 class="fw-bold text-muted mb-2"><i class="bi bi-graph-up text-primary"></i> Tendencia (Últimos 7 días)</h6>
+              <div style="position: relative; height:150px; width:100%"><canvas id="chart-tendencia"></canvas></div>
+            </div>
+
+            <div class="p-3 bg-light border-bottom">
+              <div class="row g-2">
+                <div class="col-6">
+                  <select class="form-select form-select-sm" id="filtro-hist-mes" onchange="renderizarListaHistorial()">
+                    <option value="Todos">Mes: Todos</option><option value="Enero">Enero</option><option value="Febrero">Febrero</option><option value="Marzo">Marzo</option><option value="Abril">Abril</option><option value="Mayo">Mayo</option><option value="Junio">Junio</option><option value="Julio">Julio</option><option value="Agosto">Agosto</option><option value="Septiembre">Septiembre</option><option value="Octubre">Octubre</option><option value="Noviembre">Noviembre</option><option value="Diciembre">Diciembre</option>
+                  </select>
+                </div>
+                <div class="col-6">
+                  <select class="form-select form-select-sm" id="filtro-hist-cat" onchange="renderizarListaHistorial()">
+                    <option value="Todas">Cat: Todas</option>
+                    </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="p-4" id="lista-historial"></div>
+          </div>
+
+          <div id="vista-dashboard" class="main-card mx-2 d-none-custom">
+            <div class="card-header-custom" style="background: linear-gradient(135deg, #6610f2 0%, #4609a6 100%);"><h3 class="m-0 fw-bold"><i class="bi bi-bar-chart-fill me-2"></i>Análisis</h3></div>
+            <div class="p-3 bg-light border-bottom">
+              <div class="row g-2">
+                <div class="col-6"><select class="form-select form-select-sm" id="filtro-anio" onchange="cargarDatosDashboard()"><option value="Todos">Año: Todos</option><option value="2026" selected>2026</option></select></div>
+                <div class="col-6"><select class="form-select form-select-sm" id="filtro-mes" onchange="cargarDatosDashboard()">
+                  <option value="Todos">Mes: Todos</option><option value="Enero">Enero</option><option value="Febrero" selected>Febrero</option><option value="Marzo">Marzo</option><option value="Abril">Abril</option><option value="Mayo">Mayo</option><option value="Junio">Junio</option><option value="Julio">Julio</option><option value="Agosto">Agosto</option><option value="Septiembre">Septiembre</option><option value="Octubre">Octubre</option><option value="Noviembre">Noviembre</option><option value="Diciembre">Diciembre</option>
+                </select></div>
+              </div>
+            </div>
+            <div class="p-4">
+              <div class="row g-2 mb-4">
+                <div class="col-6"><div class="summary-box bg-ingreso shadow-sm"><small class="d-block opacity-75">⬆️ Ingresos</small><strong class="fs-5" id="dash-ingresos">$0</strong></div></div>
+                <div class="col-6"><div class="summary-box bg-gasto shadow-sm"><small class="d-block opacity-75">⬇️ Gastos</small><strong class="fs-5" id="dash-gastos">$0</strong></div></div>
+                <div class="col-12 mt-2"><div class="summary-box bg-balance shadow"><small class="d-block opacity-75">💰 Balance (Disp.)</small><strong class="fs-3" id="dash-balance">$0</strong></div></div>
+              </div>
+
+              <div style="position: relative; height:220px; width:100%" class="mb-4"><canvas id="miGrafico"></canvas></div>
+              
+              <h6 class="fw-bold mb-3 border-bottom pb-2 d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-ui-checks"></i> Checklist del Mes</span>
+              </h6>
+              
+              <div class="d-flex align-items-center gap-2 mb-3">
+                <div class="d-flex gap-1 overflow-auto flex-grow-1 pb-1">
+                  <span class="filter-btn active" data-estado="todos" onclick="aplicarFiltrosChecklist(this)">Todos</span>
+                  <span class="filter-btn text-success border-success" data-estado="pagados" onclick="aplicarFiltrosChecklist(this)">Pagados</span>
+                  <span class="filter-btn text-danger border-danger" data-estado="pendientes" onclick="aplicarFiltrosChecklist(this)">Pendientes</span>
+                </div>
+              </div>
+
+              <div class="accordion" id="accordionChecklist"></div>
+            </div>
+          </div>
+
+          <div id="vista-config" class="main-card mx-2 d-none-custom">
+             <div class="card-header-custom" style="background: linear-gradient(135deg, #fd7e14 0%, #e35d00 100%);">
+              <h3 class="m-0 fw-bold"><i class="bi bi-gear-fill me-2"></i>Ajustes</h3>
+            </div>
+            <div class="p-3">
+              <div class="bg-light p-3 rounded-3 mb-3 border border-warning"><input type="password" class="form-control text-center" id="config-pin" placeholder="Ingresa PIN de Seguridad para editar" maxlength="6"></div>
+
+              <div class="accordion" id="accordionAjustes">
+                
+                <div class="accordion-item">
+                  <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#ajusteGeneral">1. Perfil y Métodos</button></h2>
+                  <div id="ajusteGeneral" class="accordion-collapse collapse" data-bs-parent="#accordionAjustes">
+                    <div class="accordion-body">
+                      <label class="small fw-bold">Personalizar Nombre:</label>
+                      <div class="input-group mb-3"><input type="text" class="form-control form-control-sm" id="nuevo-nombre" placeholder="Ej: Juan"><button class="btn btn-primary btn-sm" onclick="actualizarNombre()">Guardar</button></div>
+                      
+                      <label class="small fw-bold mt-2">Agregar Perfil (De quién es):</label>
+                      <div class="input-group mb-3"><input type="text" class="form-control form-control-sm" id="nuevo-perfil" placeholder="Ej: Negocio"><button class="btn btn-primary btn-sm" onclick="agregarOpcion('perfil', 'nuevo-perfil')">Añadir</button></div>
+
+                      <label class="small fw-bold mt-2">Agregar Método de Pago:</label>
+                      <div class="input-group mb-2"><input type="text" class="form-control form-control-sm" id="nuevo-metodo" placeholder="Ej: Daviplata"><button class="btn btn-primary btn-sm" onclick="agregarOpcion('metodo', 'nuevo-metodo')">Añadir</button></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="accordion-item">
+                  <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#ajusteCategorias">2. Categorías</button></h2>
+                  <div id="ajusteCategorias" class="accordion-collapse collapse" data-bs-parent="#accordionAjustes">
+                    <div class="accordion-body">
+                      <label class="small fw-bold">Nueva Categoría General:</label>
+                      <div class="input-group mb-3"><input type="text" class="form-control form-control-sm" id="nueva-cat" placeholder="Ej: Suscripciones"><button class="btn btn-success btn-sm" onclick="agregarOpcion('categoria', 'nueva-cat')">Crear</button></div>
+                      
+                      <label class="small fw-bold mt-2">Agregar Subcategoría a Categoría Existente:</label>
+                      <select class="form-select form-select-sm mb-2" id="select-cat-maestra"></select>
+                      <div class="input-group mb-2"><input type="text" class="form-control form-control-sm" id="nueva-subcat" placeholder="Ej: Netflix"><button class="btn btn-success btn-sm" onclick="agregarSubcategoria()">Añadir</button></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="accordion-item">
+                  <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#ajusteProy">3. Metas de Presupuesto</button></h2>
+                  <div id="ajusteProy" class="accordion-collapse collapse" data-bs-parent="#accordionAjustes">
+                    <div class="accordion-body">
+                      <button class="btn btn-outline-success w-100 fw-bold mb-4 btn-sm" onclick="pedirPinYConstruirProyecciones()"><i class="bi bi-magic me-1"></i> AUTOMATIZAR HOJA EXCEL</button>
+                      <label class="small fw-bold">Actualizar Límite Mensual:</label>
+                      <select class="form-select form-select-sm mb-2" id="select-proyeccion"><option value="">Cargando subcategorías...</option></select>
+                      <div class="input-group mb-2"><span class="input-group-text">$</span><input type="text" class="form-control form-control-sm" id="monto-proyeccion" placeholder="Monto" oninput="formatoMoneda(this)"><button class="btn btn-success btn-sm" onclick="guardarMetaProyeccion()">Fijar</button></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="accordion-item">
+                  <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#ajusteBD">4. Base de Datos</button></h2>
+                  <div id="ajusteBD" class="accordion-collapse collapse" data-bs-parent="#accordionAjustes">
+                    <div class="accordion-body">
+                      <div class="row g-2 mb-3">
+                        <div class="col-6"><button class="btn btn-outline-secondary w-100 btn-sm" onclick="exportarCSV()"><i class="bi bi-filetype-csv"></i> Bajar CSV</button></div>
+                        <div class="col-6"><button class="btn btn-success w-100 btn-sm" onclick="descargarExcel()"><i class="bi bi-file-earmark-excel"></i> Bajar XLSX</button></div>
+                      </div>
+                      <label class="small fw-bold text-muted">Importar CSV antiguo:</label>
+                      <div class="input-group mb-2"><input type="file" class="form-control form-control-sm" id="archivo-csv" accept=".csv"><button class="btn btn-secondary btn-sm" onclick="importarCSV()"><i class="bi bi-cloud-upload"></i> Subir</button></div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <div id="vista-educacion" class="main-card mx-2 d-none-custom">
+            <div class="card-header-custom" style="background: linear-gradient(135deg, #0dcaf0 0%, #087990 100%);">
+              <h3 class="m-0 fw-bold"><i class="bi bi-book-half me-2"></i>Aprende</h3>
+            </div>
+            <div class="p-4 text-center">
+              <img src="https://cdn-icons-png.flaticon.com/512/3062/3062308.png" alt="Construcción" width="120" class="mb-4 opacity-50">
+              <h4 class="fw-bold text-secondary">Sección en Construcción 🚧</h4>
+              <p class="text-muted">Muy pronto encontrarás aquí tips de educación financiera: qué es un gasto hormiga, cómo priorizar deudas, la regla 50/30/20 y más.</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="modalEdicion" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-primary text-white">
+            <h5 class="modal-title">Editar Registro</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" id="edit-fila">
+            <div class="form-floating mb-3"><input type="text" class="form-control" id="edit-concepto"><label>Concepto (Descripción)</label></div>
+            <div class="form-floating mb-3"><input type="text" class="form-control" id="edit-monto" oninput="formatoMoneda(this)"><label>Monto</label></div>
+            <p class="small text-muted mb-0"><i class="bi bi-info-circle"></i> Para cambiar fecha, categoría o archivo, elimina el registro y crea uno nuevo.</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="button" class="btn btn-primary" onclick="guardarEdicion()">Guardar Cambios</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-nav">
+      <div class="nav-item active" onclick="cambiarVista('registro', this)"><i class="bi bi-plus-circle-fill"></i><small>Registro</small></div>
+      <div class="nav-item" onclick="cambiarVista('historial', this)"><i class="bi bi-list-check"></i><small>Historial</small></div>
+      <div class="nav-item" onclick="cambiarVista('dashboard', this)"><i class="bi bi-graph-up-arrow"></i><small>Dashboard</small></div>
+      <div class="nav-item" onclick="cambiarVista('config', this)"><i class="bi bi-gear"></i><small>Ajustes</small></div>
+      <div class="nav-item" onclick="cambiarVista('educacion', this)"><i class="bi bi-lightbulb-fill"></i><small>Aprende</small></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+      let opciones = {};
+      let categoriasMaestras = [];
+      let miGraficoInstancia = null;
+      let chartTendenciaInstancia = null;
+      let modalEdicionObj = null;
+
+      window.onload = function() {
+        modalEdicionObj = new bootstrap.Modal(document.getElementById('modalEdicion'));
+        var pin = localStorage.getItem("miPinContable");
+        if (pin) { document.getElementById("pin-seguridad").value = pin; document.getElementById("config-pin").value = pin; }
+        
+        var meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+        document.getElementById("filtro-mes").value = meses[new Date().getMonth()];
+        document.getElementById("filtro-hist-mes").value = meses[new Date().getMonth()];
+
+        google.script.run.withSuccessHandler(function(config) {
+            opciones = config.opciones; 
+            categoriasMaestras = config.categoriasMaestras;
+            document.getElementById("saludo-usuario").innerText = "Hola " + config.nombre;
+            construirFormularioDinamico(config.tipos, config.metodos); 
+            cargarCategorias();
+            verificarTutorial(); 
+        }).obtenerConfiguracion();
+
+        cargarListaProyecciones();
+      };
+
+      // --- TUTORIAL ONBOARDING ---
+      function verificarTutorial() {
+        if (!localStorage.getItem('tutorialApp2026_v2')) {
+          Swal.fire({
+            title: '¡Bienvenido a tu App!',
+            text: 'Configuremos tu perfil y categorías maestras en 1 minuto.',
+            icon: 'info',
+            confirmButtonText: 'Iniciar Configuración',
+            allowOutsideClick: false
+          }).then(() => {
+            cambiarVista('config', document.querySelectorAll('.nav-item')[3]);
+            Swal.fire({ title: 'Ajustes Base', text: 'En la pestaña "Ajustes", despliega los menús para personalizar tu Nombre, Perfiles (Hogar/Personal) y Categorías. Tu PIN por defecto es 0000.', icon: 'info', confirmButtonText: '¡Entendido!' }).then(() => {
+              localStorage.setItem('tutorialApp2026_v2', 'true');
+            });
+          });
+        }
+      }
+
+      function construirFormularioDinamico(tipos, metodos) {
+        let divTipos = document.getElementById("contenedor-tipos"); let divMetodos = document.getElementById("contenedor-metodos");
+        divTipos.innerHTML = ""; divMetodos.innerHTML = "";
+        tipos.forEach((t, i) => { divTipos.innerHTML += `<div class="col-4"><input type="radio" class="btn-check" name="tipo" id="tipo${i}" value="${t}" ${i===0?'checked':''}><label class="btn btn-outline-primary" for="tipo${i}">${t}</label></div>`; });
+        metodos.forEach((m, i) => { divMetodos.innerHTML += `<div class="col-4"><input type="radio" class="btn-check" name="metodo" id="metodo${i}" value="${m}" ${i===0?'checked':''}><label class="btn btn-outline-primary" for="metodo${i}"><small>${m}</small></label></div>`; });
+      }
+
+      function cargarCategorias() {
+        var catSelect = document.getElementById("categoria");
+        var histCatSelect = document.getElementById("filtro-hist-cat");
+        var confCatSelect = document.getElementById("select-cat-maestra");
+        
+        catSelect.innerHTML = '<option value="" disabled selected>Seleccione...</option>';
+        histCatSelect.innerHTML = '<option value="Todas">Cat: Todas</option>';
+        confCatSelect.innerHTML = '<option value="" disabled selected>Selecciona Categoría...</option>';
+        
+        categoriasMaestras.forEach(cat => {
+           catSelect.add(new Option(cat, cat));
+           histCatSelect.add(new Option(cat, cat));
+           confCatSelect.add(new Option(cat, cat));
+        });
+      }
+
+      function formatoMoneda(input) { let v = input.value.replace(/\D/g, ""); input.value = v ? new Intl.NumberFormat('es-CO').format(v) : ""; }
+
+      function actualizarSubcategorias() {
+        var cat = document.getElementById("categoria").value; var sub = document.getElementById("subcategoria"); var div = document.getElementById("div-subcategoria");
+        sub.innerHTML = "";
+        if (opciones[cat] && opciones[cat].length > 0) {
+          div.classList.remove("hidden"); sub.add(new Option("Seleccione...", "")); opciones[cat].forEach(i => sub.add(new Option(i, i)));
+        } else { div.classList.add("hidden"); sub.add(new Option("N/A", "N/A")); sub.value = "N/A"; }
+      }
+
+      function procesarYEnviar() {
+        var pin = document.getElementById("pin-seguridad").value; var tipo = document.querySelector('input[name="tipo"]:checked')?.value;
+        var metodo = document.querySelector('input[name="metodo"]:checked')?.value; var cat = document.getElementById('categoria').value;
+        var sub = document.getElementById("subcategoria").value; var concepto = document.getElementById('concepto').value;
+        var monto = document.getElementById('monto').value.replace(/\D/g, ''); 
+        var fileInput = document.getElementById('archivo');
+
+        if (!pin || !tipo || !metodo || !cat || !monto || !concepto) { Swal.fire('Faltan datos', 'Completa los campos', 'warning'); return; }
+        localStorage.setItem("miPinContable", pin); document.getElementById('loader-text').innerText = "Guardando..."; document.getElementById('loader-overlay').style.display = 'flex';
+
+        var datos = { pin: pin, tipo: tipo, metodo: metodo, categoria: cat, subcategoria: sub, concepto: concepto, monto: monto, archivo: null };
+
+        if (!document.getElementById('div-evidencia').classList.contains('d-none') && fileInput.files.length > 0) {
+          var reader = new FileReader(); reader.onload = function(e) { datos.archivo = { nombre: fileInput.files[0].name, mimeType: fileInput.files[0].type, data: e.target.result.split(',')[1] }; ejecutarGuardado(datos); }; reader.readAsDataURL(fileInput.files[0]);
+        } else { ejecutarGuardado(datos); }
+      }
+
+      function ejecutarGuardado(datos) {
+        google.script.run.withSuccessHandler(res => {
+          document.getElementById('loader-overlay').style.display = 'none'; Swal.fire({icon: 'success', title: '¡Guardado!', text: res, timer: 1500, showConfirmButton: false});
+          document.getElementById("concepto").value = ""; document.getElementById("monto").value = ""; document.getElementById('div-evidencia').classList.add('d-none'); document.getElementById('toggle-evidencia').checked = false; document.getElementById('archivo').value = "";
+        }).withFailureHandler(err => { document.getElementById('loader-overlay').style.display = 'none'; Swal.fire('Error', err.message, 'error'); }).guardarGasto(datos);
+      }
+
+      function cambiarVista(vista, elementoMenu) {
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active')); elementoMenu.classList.add('active');
+        ['registro', 'historial', 'dashboard', 'config', 'educacion'].forEach(v => { document.getElementById('vista-' + v).classList.add('d-none-custom'); });
+        document.getElementById('vista-' + vista).classList.remove('d-none-custom');
+        if (vista === 'historial') cargarHistorial(); if (vista === 'dashboard') cargarDatosDashboard(); if (vista === 'config') cargarListaProyecciones();
+      }
+
+      // --- HISTORIAL (Gráfico Funcional y Filtros) ---
+      let historialCompleto = [];
+      function cargarHistorial() {
+        document.getElementById("lista-historial").innerHTML = '<div class="text-center"><div class="spinner-border text-primary"></div></div>';
+        google.script.run.withSuccessHandler(function(datos) {
+            historialCompleto = datos;
+            generarGraficoTendencia(datos);
+            renderizarListaHistorial(); // Se dibuja usando los filtros actuales
+          }).obtenerHistorial();
+      }
+
+      function renderizarListaHistorial() {
+        var mesFiltro = document.getElementById("filtro-hist-mes").value;
+        var catFiltro = document.getElementById("filtro-hist-cat").value;
+        var divLista = document.getElementById("lista-historial");
+        
+        var filtrados = historialCompleto.filter(item => {
+           let pasaMes = (mesFiltro === "Todos" || item.mes === mesFiltro);
+           let pasaCat = (catFiltro === "Todas" || item.categoria === catFiltro);
+           return pasaMes && pasaCat;
+        });
+
+        if(filtrados.length === 0) { divLista.innerHTML = '<p class="text-center text-muted">No hay registros para este filtro.</p>'; return; }
+        divLista.innerHTML = "";
+        filtrados.forEach((item) => {
+          let colorBadge = item.categoria === "Ingresos" ? "bg-success" : "bg-danger";
+          let indexReal = historialCompleto.findIndex(x => x.fila === item.fila); // Buscar index original para edición
+          
+          divLista.innerHTML += `<div class="historial-item">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <strong class="d-block fs-6">${item.concepto}</strong>
+                <small class="text-muted">${item.fecha.substring(0,10)} - ${item.categoria} (${item.subcategoria})</small><br>
+                <span class="badge ${colorBadge} mt-1">$${new Intl.NumberFormat('es-CO').format(item.monto)}</span>
+              </div>
+              <div class="ms-2 text-end" style="min-width: 60px;">
+                <button class="btn-action text-primary" onclick="abrirModalEdicion(${indexReal})"><i class="bi bi-pencil-square"></i></button>
+                <button class="btn-action text-danger" onclick="preguntarEliminar(${item.fila})"><i class="bi bi-trash3-fill"></i></button>
+              </div>
+            </div>
+          </div>`;
+        });
+      }
+
+      function generarGraficoTendencia(datos) {
+        let fechasLabels = []; let fechasISOComparar = []; let ingresosStr = []; let gastosStr = [];
+        for(let i=6; i>=0; i--) {
+           let d = new Date(); d.setDate(d.getDate() - i);
+           fechasLabels.push(d.getDate() + "/" + (d.getMonth()+1));
+           fechasISOComparar.push(d.toISOString().substring(0,10)); // Formato YYYY-MM-DD
+           ingresosStr.push(0); gastosStr.push(0);
+        }
+
+        datos.forEach(item => {
+           if(item.fecha) {
+             let fechaItemStr = item.fecha.substring(0,10);
+             let idx = fechasISOComparar.indexOf(fechaItemStr);
+             if(idx !== -1) {
+                if(item.categoria === 'Ingresos') ingresosStr[idx] += parseFloat(item.monto);
+                else if (item.categoria !== 'Ahorro') gastosStr[idx] += parseFloat(item.monto);
+             }
+           }
+        });
+
+        var ctx = document.getElementById('chart-tendencia').getContext('2d');
+        if(chartTendenciaInstancia) chartTendenciaInstancia.destroy();
+        chartTendenciaInstancia = new Chart(ctx, {
+           type: 'line',
+           data: {
+              labels: fechasLabels,
+              datasets: [
+                 { label: 'Ingresos', data: ingresosStr, borderColor: '#198754', backgroundColor: 'rgba(25, 135, 84, 0.2)', fill: true, tension: 0.4, pointRadius: 3 },
+                 { label: 'Gastos', data: gastosStr, borderColor: '#dc3545', backgroundColor: 'rgba(220, 53, 69, 0.1)', fill: true, tension: 0.4, pointRadius: 3 }
+              ]
+           },
+           options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false } } } }
+        });
+      }
+
+      function abrirModalEdicion(index) {
+        var item = historialCompleto[index]; document.getElementById("edit-fila").value = item.fila; document.getElementById("edit-concepto").value = item.concepto; document.getElementById("edit-monto").value = new Intl.NumberFormat('es-CO').format(item.monto); modalEdicionObj.show();
+      }
+
+      function guardarEdicion() {
+        var pin = document.getElementById("config-pin").value || document.getElementById("pin-seguridad").value;
+        if(!pin) { Swal.fire('Error', 'Ingresa el PIN en Ajustes primero', 'error'); return; }
+        var datosEditados = { pin: pin, monto: document.getElementById("edit-monto").value.replace(/\D/g, ''), concepto: document.getElementById("edit-concepto").value };
+        var fila = document.getElementById("edit-fila").value; modalEdicionObj.hide();
+        document.getElementById('loader-text').innerText = "Actualizando..."; document.getElementById('loader-overlay').style.display = 'flex';
+        google.script.run.withSuccessHandler(res => { document.getElementById('loader-overlay').style.display = 'none'; Swal.fire('¡Actualizado!', res, 'success'); cargarHistorial(); }).withFailureHandler(err => { document.getElementById('loader-overlay').style.display = 'none'; Swal.fire('Error', err.message, 'error'); }).editarRegistro(fila, datosEditados);
+      }
+
+      function preguntarEliminar(fila) {
+        var pin = document.getElementById("config-pin").value || document.getElementById("pin-seguridad").value;
+        Swal.fire({ title: '¿Eliminar?', text: 'Se borrará permanentemente', showCancelButton: true, confirmButtonColor: '#dc3545' }).then((result) => {
+          if (result.isConfirmed) {
+            document.getElementById('loader-overlay').style.display = 'flex';
+            google.script.run.withSuccessHandler(res => { document.getElementById('loader-overlay').style.display = 'none'; Swal.fire('Eliminado', res, 'success'); cargarHistorial(); }).withFailureHandler(err => { document.getElementById('loader-overlay').style.display = 'none'; Swal.fire('Error', err.message, 'error'); }).eliminarRegistro(fila, pin);
+          }
+        });
+      }
+
+      // --- DASHBOARD CHECKLIST ACORDEÓN ---
+      function cargarDatosDashboard() {
+        document.getElementById('loader-text').innerText = "Calculando..."; document.getElementById('loader-overlay').style.display = 'flex';
+        var f = { anio: document.getElementById("filtro-anio").value, mes: document.getElementById("filtro-mes").value };
+        google.script.run.withSuccessHandler(function(datos) {
+            document.getElementById('loader-overlay').style.display = 'none';
+            document.getElementById('dash-ingresos').innerText = "$" + new Intl.NumberFormat('es-CO').format(datos.ingresos);
+            document.getElementById('dash-gastos').innerText = "-$" + new Intl.NumberFormat('es-CO').format(datos.gastos);
+            document.getElementById('dash-balance').innerText = "$" + new Intl.NumberFormat('es-CO').format(datos.balance);
+            if(datos.balance < 0) document.getElementById('dash-balance').classList.replace('text-white', 'text-warning'); else document.getElementById('dash-balance').classList.replace('text-warning', 'text-white');
+            
+            var ctx = document.getElementById('miGrafico').getContext('2d'); if (miGraficoInstancia) miGraficoInstancia.destroy();
+            miGraficoInstancia = new Chart(ctx, { type: 'doughnut', data: { labels: datos.labelsGrafico, datasets: [{ data: datos.datosGrafico, backgroundColor: ['#dc3545', '#fd7e14', '#ffc107', '#20c997', '#0dcaf0', '#0d6efd', '#6f42c1'], borderWidth: 2, borderColor: '#ffffff' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: {boxWidth: 10} } } } });
+            
+            var divCheck = document.getElementById("accordionChecklist"); var htmlCheck = '';
+            var count = 0;
+            for (var categoria in datos.checklistJerarquico) {
+               var items = datos.checklistJerarquico[categoria];
+               if(items.length > 0) {
+                 htmlCheck += `
+                 <div class="accordion-item data-group">
+                    <h2 class="accordion-header">
+                      <button class="accordion-button ${count===0?'':'collapsed'}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCheck${count}">
+                        ${categoria}
+                      </button>
+                    </h2>
+                    <div id="collapseCheck${count}" class="accordion-collapse collapse ${count===0?'show':''}" data-bs-parent="#accordionChecklist">
+                      <div class="accordion-body p-2">`;
+                 
+                 items.forEach(c => {
+                   let icon = c.pagado ? '<i class="bi bi-check-circle-fill text-success"></i>' : '<i class="bi bi-circle text-danger"></i>';
+                   let statusClass = c.pagado ? 'item-pagado' : 'item-pendiente';
+                   let colorText = c.pagado ? 'text-success' : 'text-danger';
+                   let tachado = c.pagado ? 'text-decoration-line-through text-muted' : 'fw-bold';
+                   let montoStr = c.pagado ? `($${new Intl.NumberFormat('es-CO').format(c.montoPagado)})` : '';
+                   
+                   htmlCheck += `<div class="checklist-item ${statusClass} ${colorText}">
+                                   <div class="d-flex align-items-center gap-2">${icon} <span class="${tachado}">${c.subcategoria}</span></div>
+                                   <small class="opacity-75">${montoStr}</small>
+                                 </div>`;
+                 });
+                 htmlCheck += `</div></div></div>`;
+                 count++;
+               }
+            }
+            if(htmlCheck === '') htmlCheck = '<p class="text-muted small">No hay gastos configurados.</p>';
+            divCheck.innerHTML = htmlCheck;
+            
+            aplicarFiltrosChecklist(document.querySelector('.filter-btn.active'));
+          }).obtenerDatosDashboardAvanzado(f);
+      }
+
+      function aplicarFiltrosChecklist(elemento) {
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+          btn.classList.remove('active', 'text-white');
+          if(btn.dataset.estado === "pagados") { btn.classList.add('text-success'); btn.classList.remove('bg-success'); }
+          if(btn.dataset.estado === "pendientes") { btn.classList.add('text-danger'); btn.classList.remove('bg-danger'); }
+          if(btn.dataset.estado === "todos") { btn.classList.remove('bg-primary'); }
+        });
+        elemento.classList.add('active', 'text-white');
+        if(elemento.dataset.estado === 'pagados') { elemento.classList.replace('text-success', 'bg-success'); }
+        else if(elemento.dataset.estado === 'pendientes') { elemento.classList.replace('text-danger', 'bg-danger'); }
+        else { elemento.classList.add('bg-primary'); }
+
+        let estadoSeleccionado = elemento.dataset.estado;
+
+        document.querySelectorAll('.data-group').forEach(group => {
+           let items = group.querySelectorAll('.checklist-item');
+           let visibles = 0;
+           items.forEach(item => {
+              let esPagado = item.classList.contains('item-pagado');
+              if(estadoSeleccionado === 'todos' || (estadoSeleccionado === 'pagados' && esPagado) || (estadoSeleccionado === 'pendientes' && !esPagado)) {
+                 item.style.display = 'flex'; visibles++;
+              } else { item.style.display = 'none'; }
+           });
+           group.style.display = (visibles === 0) ? 'none' : 'block';
+        });
+      }
+
+      // --- CONFIGURACIÓN Y PROYECCIONES ---
+      function actualizarNombre() {
+        var nombre = document.getElementById("nuevo-nombre").value; var pin = document.getElementById("config-pin").value;
+        if(!nombre || !pin) return Swal.fire('Atención', 'Ingresa el nombre y el PIN', 'warning');
+        document.getElementById('loader-text').innerText = "Guardando..."; document.getElementById('loader-overlay').style.display = 'flex';
+        google.script.run.withSuccessHandler(res => {
+          document.getElementById('loader-overlay').style.display = 'none'; 
+          document.getElementById("saludo-usuario").innerText = "Hola " + nombre; 
+          document.getElementById("nuevo-nombre").value = ""; 
+          Swal.fire('Éxito', res, 'success');
+        }).withFailureHandler(err => { document.getElementById('loader-overlay').style.display = 'none'; Swal.fire('Error', err.message, 'error'); }).cambiarNombreUsuario(nombre, pin);
+      }
+
+      function agregarOpcion(tipo, inputId) {
+        var valor = document.getElementById(inputId).value; var pin = document.getElementById("config-pin").value;
+        if(!valor || !pin) { Swal.fire('Atención', 'Ingresa el dato y el PIN principal de ajustes', 'warning'); return; }
+        document.getElementById('loader-text').innerText = "Actualizando..."; document.getElementById('loader-overlay').style.display = 'flex';
+        google.script.run.withSuccessHandler(res => { document.getElementById('loader-overlay').style.display = 'none'; Swal.fire('Éxito', res, 'success').then(() => window.top.location.reload()); })
+          .withFailureHandler(err => { document.getElementById('loader-overlay').style.display = 'none'; Swal.fire('Error', err.message, 'error'); }).agregarElementoConfig(tipo, valor, "", pin);
+      }
+
+      function agregarSubcategoria() {
+        var catMaestra = document.getElementById("select-cat-maestra").value;
+        var subcat = document.getElementById("nueva-subcat").value;
+        var pin = document.getElementById("config-pin").value;
+        if(!catMaestra || !subcat || !pin) { Swal.fire('Atención', 'Selecciona categoría, escribe subcategoría y PIN', 'warning'); return; }
+        document.getElementById('loader-overlay').style.display = 'flex';
+        google.script.run.withSuccessHandler(res => { document.getElementById('loader-overlay').style.display = 'none'; Swal.fire('Éxito', res, 'success').then(() => window.top.location.reload()); })
+          .withFailureHandler(err => { document.getElementById('loader-overlay').style.display = 'none'; Swal.fire('Error', err.message, 'error'); }).agregarElementoConfig('subcategoria', catMaestra, subcat, pin);
+      }
+
+      function pedirPinYConstruirProyecciones() {
+        var pin = document.getElementById("config-pin").value;
+        if(!pin) { Swal.fire('Atención', 'Ingresa el PIN de Seguridad arriba', 'warning'); return; }
+        Swal.fire({ title: '¿Automatizar Excel?', text: "Se construirán las fórmulas. La tabla de proyecciones actual se reiniciará.", icon: 'warning', showCancelButton: true, confirmButtonColor: '#198754' }).then((result) => {
+          if (result.isConfirmed) {
+            document.getElementById('loader-overlay').style.display = 'flex';
+            google.script.run.withSuccessHandler(res => { document.getElementById('loader-overlay').style.display = 'none'; Swal.fire('Listo', res, 'success'); cargarListaProyecciones(); })
+              .withFailureHandler(err => { document.getElementById('loader-overlay').style.display = 'none'; Swal.fire('Error', err.message, 'error'); }).autoConstruirProyecciones(pin);
+          }
+        });
+      }
+
+      function cargarListaProyecciones() {
+        var select = document.getElementById("select-proyeccion"); select.innerHTML = '<option value="">Cargando...</option>';
+        google.script.run.withSuccessHandler(function(lista) {
+           select.innerHTML = '<option value="" disabled selected>Selecciona subcategoría...</option>';
+           lista.forEach(item => select.add(new Option(`${item.nombre} (Meta: $${new Intl.NumberFormat('es-CO').format(item.meta)})`, item.nombre)));
+        }).obtenerListaProyecciones();
+      }
+
+      function guardarMetaProyeccion() {
+        var subcat = document.getElementById("select-proyeccion").value; var monto = document.getElementById("monto-proyeccion").value.replace(/\D/g, ''); var pin = document.getElementById("config-pin").value;
+        if(!subcat || !monto || !pin) { Swal.fire('Faltan datos', 'Selecciona la categoría, el presupuesto y escribe el PIN', 'warning'); return; }
+        document.getElementById('loader-overlay').style.display = 'flex';
+        google.script.run.withSuccessHandler(res => { 
+            document.getElementById('loader-overlay').style.display = 'none'; Swal.fire('Éxito', res, 'success'); document.getElementById("monto-proyeccion").value = ""; cargarListaProyecciones(); 
+        }).withFailureHandler(err => { document.getElementById('loader-overlay').style.display = 'none'; Swal.fire('Error', err.message, 'error'); }).actualizarMetaProyeccion(subcat, monto, pin);
+      }
+
+      function exportarCSV() {
+        document.getElementById('loader-overlay').style.display = 'flex';
+        google.script.run.withSuccessHandler(function(csvStr) {
+          document.getElementById('loader-overlay').style.display = 'none';
+          var blob = new Blob([csvStr], { type: 'text/csv;charset=utf-8;' }); var link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "Gastos.csv"; link.click();
+        }).exportarDatosCSV();
+      }
+
+      function descargarExcel() {
+        document.getElementById('loader-overlay').style.display = 'flex';
+        google.script.run.withSuccessHandler(function(url) {
+          document.getElementById('loader-overlay').style.display = 'none'; window.open(url, "_blank"); 
+        }).obtenerUrlExportacionXLSX();
+      }
+
+      function importarCSV() {
+        var fileInput = document.getElementById('archivo-csv'); var pin = document.getElementById("config-pin").value;
+        if(fileInput.files.length === 0 || !pin) { Swal.fire('Atención', 'Selecciona un archivo y escribe el PIN', 'warning'); return; }
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          document.getElementById('loader-overlay').style.display = 'flex';
+          google.script.run.withSuccessHandler(res => { document.getElementById('loader-overlay').style.display = 'none'; Swal.fire('Éxito', res, 'success'); })
+            .withFailureHandler(err => { document.getElementById('loader-overlay').style.display = 'none'; Swal.fire('Error', err.message, 'error'); }).importarDatosCSV(e.target.result, pin);
+        };
+        reader.readAsText(fileInput.files[0]);
+      }
+    </script>
+  </body>
+</html>
